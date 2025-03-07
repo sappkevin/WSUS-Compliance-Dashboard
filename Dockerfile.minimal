@@ -13,7 +13,7 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
 RUN choco install git nodejs-lts nano -y
 
 # Refresh environment variables
-RUN $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
+RUN refreshenv || $true 
 
 # Try to enable the RSAT feature for WSUS tools (may fail in some environments)
 RUN try { \
