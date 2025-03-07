@@ -65,7 +65,10 @@ The WSUS service account needs:
 ## Running the Application
 
 ### Generate Session Secret
+```bash
 python .\generate_session_secret.py
+```
+
 
 ### Install dependencies
 ```bash
