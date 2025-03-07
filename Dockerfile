@@ -14,19 +14,7 @@ RUN choco install git -y
 RUN choco install nodejs-lts -y
 RUN choco install nano -y
 
-# Refresh environment variables
-RUN try { \
-      if (Test-Path $env:ChocolateyInstall\helpers\chocolateyProfile.psm1) { \
-        Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1; \
-        Update-SessionEnvironment; \
-      } else { \
-        Write-Host "Chocolatey profile module not found, skipping environment refresh"; \
-      } \
-    } catch { \
-      Write-Host "Error refreshing environment: $_"; \
-    } 
-
-# Try to enable the RSAT feature for WSUS tools (may require Windows Server edition)
+# Enable the RSAT feature for WSUS tools - this requires Windows Server
 RUN try { \
       Install-WindowsFeature -Name RSAT-WSUS -IncludeManagementTools -IncludeAllSubFeature; \
       Write-Host "WSUS Tools installed successfully."; \
@@ -34,7 +22,7 @@ RUN try { \
       Write-Host "WARNING: Failed to install WSUS Tools. Error: $_"; \
     }
 
-# Try to install required PowerShell modules
+# Install required PowerShell modules
 RUN try { \
       Install-Module -Name PSWindowsUpdate -Force -AllowClobber -SkipPublisherCheck; \
       Write-Host "PSWindowsUpdate module installed successfully."; \
@@ -72,34 +60,6 @@ RUN Write-Host "Installing Node.js dependencies..."; \
       Write-Host "Dependencies installed successfully."; \
     }
 
-# Create a default .env.example file if it doesn't exist
-RUN if (-not (Test-Path .env.example)) { \
-      $envContent = @"
-# WSUS Server Configuration
-WSUS_SERVER=your-wsus-server
-WSUS_PORT=8530
-WSUS_USE_SSL=false
-
-# WSUS Service Account
-WSUS_SERVICE_ACCOUNT=domain\\service-account
-WSUS_SERVICE_PASSWORD=your-service-password
-
-# LDAP Configuration
-LDAP_URL=ldap://your-domain-controller
-LDAP_BASE_DN=DC=your,DC=domain,DC=com
-LDAP_USERNAME_ATTRIBUTE=sAMAccountName
-LDAP_GROUP_BASE_DN=OU=Groups,DC=your,DC=domain,DC=com
-LDAP_REQUIRED_GROUP=CN=WSUS_Admins,OU=Groups,DC=your,DC=domain,DC=com
-
-# Session Configuration
-SESSION_SECRET=your-random-secret-key
-
-# PowerShell Execution Configuration
-POWERSHELL_EXECUTION_POLICY=Bypass
-"@; \
-      Set-Content -Path .env.example -Value $envContent -Encoding UTF8; \
-    }
-
 # Build the application if a build script exists
 RUN if (Test-Path package.json) { \
       $packageJson = Get-Content package.json | ConvertFrom-Json; \
@@ -119,51 +79,51 @@ RUN if (Test-Path package.json) { \
 # Expose the port the app runs on
 EXPOSE 5000
 
-# Create a startup script
-RUN echo '# Container startup script for WSUS Dashboard' > /app/startup.ps1 && \
-    echo 'Write-Host "Starting WSUS Dashboard Container..." -ForegroundColor Green' >> /app/startup.ps1 && \
-    echo '' >> /app/startup.ps1 && \
-    echo '# Check if .env file exists' >> /app/startup.ps1 && \
-    echo 'if (-not (Test-Path .env)) {' >> /app/startup.ps1 && \
-    echo '    Write-Host "No .env file found. Creating from template..." -ForegroundColor Yellow' >> /app/startup.ps1 && \
-    echo '    ' >> /app/startup.ps1 && \
-    echo '    if (Test-Path .env.example) {' >> /app/startup.ps1 && \
-    echo '        Copy-Item .env.example .env' >> /app/startup.ps1 && \
-    echo '        Write-Host "IMPORTANT: Default .env file created from template." -ForegroundColor Yellow' >> /app/startup.ps1 && \
-    echo '        Write-Host "You need to edit this file with your actual WSUS server settings." -ForegroundColor Yellow' >> /app/startup.ps1 && \
-    echo '        Write-Host "Use nano .env to edit the file." -ForegroundColor Yellow' >> /app/startup.ps1 && \
-    echo '        Write-Host "After editing, restart the container for changes to take effect." -ForegroundColor Yellow' >> /app/startup.ps1 && \
-    echo '    } else {' >> /app/startup.ps1 && \
-    echo '        Write-Host "ERROR: .env.example file not found!" -ForegroundColor Red' >> /app/startup.ps1 && \
-    echo '        exit 1' >> /app/startup.ps1 && \
-    echo '    }' >> /app/startup.ps1 && \
-    echo '}' >> /app/startup.ps1 && \
-    echo '' >> /app/startup.ps1 && \
-    echo '# Check if WSUS tools are available' >> /app/startup.ps1 && \
-    echo 'try {' >> /app/startup.ps1 && \
-    echo '    $module = Get-Module -ListAvailable -Name UpdateServices' >> /app/startup.ps1 && \
-    echo '    if ($null -eq $module) {' >> /app/startup.ps1 && \
-    echo '        Write-Host "WARNING: UpdateServices module not found. Some WSUS functionality may not work." -ForegroundColor Yellow' >> /app/startup.ps1 && \
-    echo '    } else {' >> /app/startup.ps1 && \
-    echo '        Write-Host "WSUS tools are available." -ForegroundColor Green' >> /app/startup.ps1 && \
-    echo '    }' >> /app/startup.ps1 && \
-    echo '} catch {' >> /app/startup.ps1 && \
-    echo '    Write-Host "WARNING: Error checking WSUS tools: $_" -ForegroundColor Yellow' >> /app/startup.ps1 && \
-    echo '}' >> /app/startup.ps1 && \
-    echo '' >> /app/startup.ps1 && \
-    echo '# Display some help information' >> /app/startup.ps1 && \
-    echo 'Write-Host "WSUS Dashboard Container" -ForegroundColor Cyan' >> /app/startup.ps1 && \
-    echo 'Write-Host "===================================================================" -ForegroundColor Cyan' >> /app/startup.ps1 && \
-    echo 'Write-Host "The WSUS Dashboard is now starting. To access the dashboard:" -ForegroundColor Cyan' >> /app/startup.ps1 && \
-    echo 'Write-Host "- Open a web browser and navigate to http://localhost:5000" -ForegroundColor Cyan' >> /app/startup.ps1 && \
-    echo 'Write-Host "" -ForegroundColor Cyan' >> /app/startup.ps1 && \
-    echo 'Write-Host "For help and configuration:" -ForegroundColor Cyan' >> /app/startup.ps1 && \
-    echo 'Write-Host "- Edit the .env file: nano .env" -ForegroundColor Cyan' >> /app/startup.ps1 && \
-    echo 'Write-Host "===================================================================" -ForegroundColor Cyan' >> /app/startup.ps1 && \
-    echo '' >> /app/startup.ps1 && \
-    echo '# Start the application' >> /app/startup.ps1 && \
-    echo 'Write-Host "Starting WSUS Dashboard application..." -ForegroundColor Green' >> /app/startup.ps1 && \
-    echo 'npm start' >> /app/startup.ps1
+# Create a startup script with direct echo commands
+RUN echo "# Container startup script for WSUS Dashboard" > /app/startup.ps1
+RUN echo "Write-Host \"Starting WSUS Dashboard Container...\" -ForegroundColor Green" >> /app/startup.ps1
+RUN echo "" >> /app/startup.ps1
+RUN echo "# Check if .env file exists" >> /app/startup.ps1
+RUN echo "if (-not (Test-Path .env)) {" >> /app/startup.ps1
+RUN echo "    Write-Host \"No .env file found. Creating from template...\" -ForegroundColor Yellow" >> /app/startup.ps1
+RUN echo "    " >> /app/startup.ps1
+RUN echo "    if (Test-Path .env.example) {" >> /app/startup.ps1
+RUN echo "        Copy-Item .env.example .env" >> /app/startup.ps1
+RUN echo "        Write-Host \"IMPORTANT: Default .env file created from template.\" -ForegroundColor Yellow" >> /app/startup.ps1
+RUN echo "        Write-Host \"You need to edit this file with your actual WSUS server settings.\" -ForegroundColor Yellow" >> /app/startup.ps1
+RUN echo "        Write-Host \"Use nano .env to edit the file.\" -ForegroundColor Yellow" >> /app/startup.ps1
+RUN echo "        Write-Host \"After editing, restart the container for changes to take effect.\" -ForegroundColor Yellow" >> /app/startup.ps1
+RUN echo "    } else {" >> /app/startup.ps1
+RUN echo "        Write-Host \"ERROR: .env.example file not found!\" -ForegroundColor Red" >> /app/startup.ps1
+RUN echo "        exit 1" >> /app/startup.ps1
+RUN echo "    }" >> /app/startup.ps1
+RUN echo "}" >> /app/startup.ps1
+RUN echo "" >> /app/startup.ps1
+RUN echo "# Check if WSUS tools are available" >> /app/startup.ps1
+RUN echo "try {" >> /app/startup.ps1
+RUN echo "    \$module = Get-Module -ListAvailable -Name UpdateServices" >> /app/startup.ps1
+RUN echo "    if (\$null -eq \$module) {" >> /app/startup.ps1
+RUN echo "        Write-Host \"WARNING: UpdateServices module not found. Some WSUS functionality may not work.\" -ForegroundColor Yellow" >> /app/startup.ps1
+RUN echo "    } else {" >> /app/startup.ps1
+RUN echo "        Write-Host \"WSUS tools are available.\" -ForegroundColor Green" >> /app/startup.ps1
+RUN echo "    }" >> /app/startup.ps1
+RUN echo "} catch {" >> /app/startup.ps1
+RUN echo "    Write-Host \"WARNING: Error checking WSUS tools: \$_\" -ForegroundColor Yellow" >> /app/startup.ps1
+RUN echo "}" >> /app/startup.ps1
+RUN echo "" >> /app/startup.ps1
+RUN echo "# Display some help information" >> /app/startup.ps1
+RUN echo "Write-Host \"WSUS Dashboard Container\" -ForegroundColor Cyan" >> /app/startup.ps1
+RUN echo "Write-Host \"===================================================================\" -ForegroundColor Cyan" >> /app/startup.ps1
+RUN echo "Write-Host \"The WSUS Dashboard is now starting. To access the dashboard:\" -ForegroundColor Cyan" >> /app/startup.ps1
+RUN echo "Write-Host \"- Open a web browser and navigate to http://localhost:5000\" -ForegroundColor Cyan" >> /app/startup.ps1
+RUN echo "Write-Host \"\" -ForegroundColor Cyan" >> /app/startup.ps1
+RUN echo "Write-Host \"For help and configuration:\" -ForegroundColor Cyan" >> /app/startup.ps1
+RUN echo "Write-Host \"- Edit the .env file: nano .env\" -ForegroundColor Cyan" >> /app/startup.ps1
+RUN echo "Write-Host \"===================================================================\" -ForegroundColor Cyan" >> /app/startup.ps1
+RUN echo "" >> /app/startup.ps1
+RUN echo "# Start the application" >> /app/startup.ps1
+RUN echo "Write-Host \"Starting WSUS Dashboard application...\" -ForegroundColor Green" >> /app/startup.ps1
+RUN echo "npm start" >> /app/startup.ps1
 
 # Set the entry point
-ENTRYPOINT ["powershell", "-File", "startup.ps1"]
+ENTRYPOINT ["powershell", "-File", "/app/startup.ps1"]
