@@ -1,0 +1,54 @@
+# Start with a Windows Server Core image that has PowerShell
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+# Set shell to PowerShell for Windows commands
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Install Chocolatey package manager
+RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+    iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+
+# Install Git, Node.js, and Nano
+RUN choco install git nodejs-lts nano -y
+
+# Refresh environment variables
+RUN refreshenv
+
+# Enable the RSAT feature for WSUS tools
+RUN Install-WindowsFeature -Name RSAT-WSUS -IncludeManagementTools -IncludeAllSubFeature
+
+# Install required PowerShell modules
+RUN Install-Module -Name PSWindowsUpdate -Force -AllowClobber -SkipPublisherCheck
+RUN Install-Module -Name UpdateServices -Force -AllowClobber -SkipPublisherCheck
+
+# Create app directory and copy application files
+WORKDIR /app
+COPY . .
+
+# Install dependencies
+RUN npm install
+
+# Build the application
+RUN npm run build
+
+# Expose the port the app runs on
+EXPOSE 5000
+
+# Create a startup script
+RUN @'
+# Container startup script
+if (-not (Test-Path .env)) {
+    Write-Host "No .env file found. Creating from template..."
+    if (Test-Path .env.example) {
+        Copy-Item .env.example .env
+        Write-Host "Created .env file from template. Please edit with your actual settings."
+    }
+}
+
+# Start the application
+npm start
+'@ | Out-File -FilePath /app/startup.ps1 -Encoding utf8
+
+# Set the entry point
+ENTRYPOINT ["powershell", "-File", "startup.ps1"]

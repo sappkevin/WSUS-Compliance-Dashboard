@@ -1,0 +1,128 @@
+# Start with a Windows Server Core image that has PowerShell
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+# Set shell to PowerShell for Windows commands
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Install Chocolatey package manager
+RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+    iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+
+# Install Git
+RUN choco install git -y
+
+# Install Node.js
+RUN choco install nodejs-lts -y
+
+# Install Nano text editor for .env file editing
+RUN choco install nano -y
+
+# Install Visual Studio Code (for a GUI editor if needed)
+RUN choco install vscode -y
+
+# Install PowerShell 7 (newer version with better features)
+RUN choco install powershell-core -y
+
+# Refresh environment variables
+RUN refreshenv
+
+# Enable the RSAT feature for WSUS tools - this requires Windows Server
+RUN Install-WindowsFeature -Name RSAT-WSUS -IncludeManagementTools -IncludeAllSubFeature
+
+# Install required PowerShell modules
+RUN Install-Module -Name PSWindowsUpdate -Force -AllowClobber -SkipPublisherCheck
+RUN Install-Module -Name UpdateServices -Force -AllowClobber -SkipPublisherCheck
+
+# Define build arguments for repository information
+ARG REPO_URL=https://github.com/sappkevin/WSUS-Compliance-Dashboard.git
+ARG REPO_BRANCH=main
+
+# Create app directory
+WORKDIR /app
+
+# Clone the specific GitHub repository
+RUN git clone --branch $env:REPO_BRANCH $env:REPO_URL .
+
+# Install dependencies
+RUN npm install
+
+# Create a .env.example file that users can copy to .env
+COPY .env.example .env.example
+RUN Write-Output "# Copy this file to .env and edit with your settings\n\n# Instructions for editing:\n# 1. Use 'nano .env' or 'code .env' to edit\n# 2. Save and exit\n# 3. Restart the container" | Out-File -FilePath /app/README.env -Encoding utf8
+
+# Build the application
+RUN npm run build
+
+# Expose the port the app runs on
+EXPOSE 5000
+
+# Create scripts directory if it doesn't exist
+RUN New-Item -Path /app/scripts -ItemType Directory -Force
+
+# Create container startup script
+RUN @'
+# Container startup script for WSUS Dashboard
+Write-Host "Starting WSUS Dashboard Container..." -ForegroundColor Green
+
+# Check if .env file exists
+if (-not (Test-Path .env)) {
+    Write-Host "No .env file found. Creating from template..." -ForegroundColor Yellow
+    
+    if (Test-Path .env.example) {
+        Copy-Item .env.example .env
+        Write-Host @"
+===================================================================
+IMPORTANT: Default .env file created from template.
+You need to edit this file with your actual WSUS server settings.
+
+Use one of the following commands to edit the file:
+  - nano .env
+  - code .env (if running with GUI support)
+
+After editing, restart the container for changes to take effect.
+===================================================================
+"@ -ForegroundColor Yellow
+    } else {
+        Write-Host "ERROR: .env.example file not found!" -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Check if WSUS tools are available
+try {
+    $module = Get-Module -ListAvailable -Name UpdateServices
+    if ($null -eq $module) {
+        Write-Host "WARNING: UpdateServices module not found. Some WSUS functionality may not work." -ForegroundColor Yellow
+    } else {
+        Write-Host "WSUS tools are available." -ForegroundColor Green
+    }
+} catch {
+    Write-Host "WARNING: Error checking WSUS tools: $_" -ForegroundColor Yellow
+}
+
+# Display some help information
+Write-Host @"
+
+===================================================================
+WSUS Dashboard Container
+===================================================================
+
+The WSUS Dashboard is now starting. To access the dashboard:
+- Open a web browser and navigate to http://localhost:5000
+
+For help and configuration:
+- Edit the .env file: nano .env
+- View logs: Get-Content logs/app.log -Tail 20 -Wait
+- Restart the application: npm run dev
+
+===================================================================
+"@ -ForegroundColor Cyan
+
+# Start the application
+Write-Host "Starting WSUS Dashboard application..." -ForegroundColor Green
+npm start
+'@ | Out-File -FilePath /app/scripts/container-startup.ps1 -Encoding utf8
+
+# Set the entry point to run our startup script
+ENTRYPOINT ["powershell", "-File", "/app/scripts/container-startup.ps1"]
