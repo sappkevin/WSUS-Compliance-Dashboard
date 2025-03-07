@@ -25,31 +25,41 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
+      # Prepare tags for Docker image
+      - name: Prepare tags
+        id: prep
+        run: |
+          $VERSION = ""
+          if ("${{ github.ref }}" -like "refs/tags/v*") {
+            $VERSION = "${{ github.ref }}".Replace('refs/tags/v', '')
+          } elseif ("${{ github.ref }}" -eq "refs/heads/main" -or "${{ github.ref }}" -eq "refs/heads/master") {
+            $VERSION = "latest"
+          } else {
+            $VERSION = "${{ github.sha }}".Substring(0, 7)
+          }
+          
+          $TAGS = "${{ env.IMAGE_NAME }}:$VERSION"
+          if ($VERSION -eq "latest") {
+            $TAGS = "$TAGS,${{ env.IMAGE_NAME }}:${{ github.sha }}".Substring(0, 7)
+          }
+          
+          echo "version=$VERSION" >> $env:GITHUB_OUTPUT
+          echo "tags=$TAGS" >> $env:GITHUB_OUTPUT
+          
+          echo "Building Docker image with tags: $TAGS"
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      # Build the Docker image directly with standard Docker commands
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.IMAGE_NAME }}:${{ steps.prep.outputs.version }} .
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            REPO_URL=https://github.com/sappkevin/WSUS-Compliance-Dashboard.git
-            REPO_BRANCH=main
+      # Push the image if this is a push event (not a pull request)
+      - name: Push Docker image
+        if: github.event_name != 'pull_request'
+        run: |
+          $TAGS = "${{ steps.prep.outputs.tags }}".Split(",")
+          foreach ($TAG in $TAGS) {
+            echo "Pushing $TAG"
+            docker tag ${{ env.IMAGE_NAME }}:${{ steps.prep.outputs.version }} $TAG
+            docker push $TAG
+          }

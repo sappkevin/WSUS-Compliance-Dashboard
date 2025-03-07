@@ -1,0 +1,84 @@
+# Start with a Windows Server Core image that has PowerShell
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+# Set shell to PowerShell for Windows commands
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Install Chocolatey package manager
+RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+
+# Install required tools
+RUN choco install git nodejs-lts nano -y
+
+# Refresh environment variables
+RUN $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
+
+# Try to enable the RSAT feature for WSUS tools (may fail in some environments)
+RUN try { \
+      Install-WindowsFeature -Name RSAT-WSUS -IncludeManagementTools -IncludeAllSubFeature; \
+      Write-Host "WSUS Tools installed successfully."; \
+    } catch { \
+      Write-Host "WARNING: Unable to install WSUS Tools. This container may need to be run on Windows Server."; \
+    }
+
+# Try to install PowerShell modules (may fail if RSAT-WSUS not installed)
+RUN try { \
+      Install-Module -Name PSWindowsUpdate -Force -AllowClobber -SkipPublisherCheck; \
+      Install-Module -Name UpdateServices -Force -AllowClobber -SkipPublisherCheck; \
+      Write-Host "PowerShell modules installed successfully."; \
+    } catch { \
+      Write-Host "WARNING: Unable to install PowerShell modules. Some features may not work."; \
+    }
+
+# Create app directory and copy application files
+WORKDIR /app
+COPY . .
+
+# Install dependencies 
+RUN npm install
+
+# Build the application if a build script exists
+RUN if (Test-Path package.json) { \
+      $packageJson = Get-Content package.json | ConvertFrom-Json; \
+      if ($packageJson.scripts.build) { \
+        npm run build; \
+      } \
+    }
+
+# Expose the port the app runs on
+EXPOSE 5000
+
+# Create a startup script
+RUN echo '# Container startup script' > /app/startup.ps1 && \
+    echo 'Write-Host "Starting WSUS Compliance Dashboard..." -ForegroundColor Green' >> /app/startup.ps1 && \
+    echo '' >> /app/startup.ps1 && \
+    echo '# Check for .env file' >> /app/startup.ps1 && \
+    echo 'if (-not (Test-Path .env)) {' >> /app/startup.ps1 && \
+    echo '    Write-Host "No .env file found. Creating from template..." -ForegroundColor Yellow' >> /app/startup.ps1 && \
+    echo '    if (Test-Path .env.example) {' >> /app/startup.ps1 && \
+    echo '        Copy-Item .env.example .env' >> /app/startup.ps1 && \
+    echo '        Write-Host "Created .env file from template. Please edit with your actual settings." -ForegroundColor Yellow' >> /app/startup.ps1 && \
+    echo '    } else {' >> /app/startup.ps1 && \
+    echo '        Write-Host "WARNING: No .env.example file found!" -ForegroundColor Red' >> /app/startup.ps1 && \
+    echo '    }' >> /app/startup.ps1 && \
+    echo '}' >> /app/startup.ps1 && \
+    echo '' >> /app/startup.ps1 && \
+    echo '# Check if WSUS tools are available' >> /app/startup.ps1 && \
+    echo 'try {' >> /app/startup.ps1 && \
+    echo '    $module = Get-Module -ListAvailable -Name UpdateServices' >> /app/startup.ps1 && \
+    echo '    if ($null -eq $module) {' >> /app/startup.ps1 && \
+    echo '        Write-Host "WARNING: UpdateServices module not found. Some WSUS functionality may not work." -ForegroundColor Yellow' >> /app/startup.ps1 && \
+    echo '    } else {' >> /app/startup.ps1 && \
+    echo '        Write-Host "WSUS tools are available." -ForegroundColor Green' >> /app/startup.ps1 && \
+    echo '    }' >> /app/startup.ps1 && \
+    echo '} catch {' >> /app/startup.ps1 && \
+    echo '    Write-Host "WARNING: Error checking WSUS tools: $_" -ForegroundColor Yellow' >> /app/startup.ps1 && \
+    echo '}' >> /app/startup.ps1 && \
+    echo '' >> /app/startup.ps1 && \
+    echo '# Start the application' >> /app/startup.ps1 && \
+    echo 'npm start' >> /app/startup.ps1
+
+# Set the entry point
+ENTRYPOINT ["powershell", "-File", "startup.ps1"]
