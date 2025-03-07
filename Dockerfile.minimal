@@ -12,18 +12,6 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
 # Install required tools
 RUN choco install git nodejs-lts nano -y
 
-# Refresh environment variables
-RUN try { \
-      if (Test-Path $env:ChocolateyInstall\helpers\chocolateyProfile.psm1) { \
-        Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1; \
-        Update-SessionEnvironment; \
-      } else { \
-        Write-Host "Chocolatey profile module not found, skipping environment refresh"; \
-      } \
-    } catch { \
-      Write-Host "Error refreshing environment: $_"; \
-    } 
-
 # Try to enable the RSAT feature for WSUS tools (may fail in some environments)
 RUN try { \
       Install-WindowsFeature -Name RSAT-WSUS -IncludeManagementTools -IncludeAllSubFeature; \
@@ -60,34 +48,34 @@ RUN if (Test-Path package.json) { \
 EXPOSE 5000
 
 # Create a startup script
-RUN echo '# Container startup script' > /app/startup.ps1 && \
-    echo 'Write-Host "Starting WSUS Compliance Dashboard..." -ForegroundColor Green' >> /app/startup.ps1 && \
-    echo '' >> /app/startup.ps1 && \
-    echo '# Check for .env file' >> /app/startup.ps1 && \
-    echo 'if (-not (Test-Path .env)) {' >> /app/startup.ps1 && \
-    echo '    Write-Host "No .env file found. Creating from template..." -ForegroundColor Yellow' >> /app/startup.ps1 && \
-    echo '    if (Test-Path .env.example) {' >> /app/startup.ps1 && \
-    echo '        Copy-Item .env.example .env' >> /app/startup.ps1 && \
-    echo '        Write-Host "Created .env file from template. Please edit with your actual settings." -ForegroundColor Yellow' >> /app/startup.ps1 && \
-    echo '    } else {' >> /app/startup.ps1 && \
-    echo '        Write-Host "WARNING: No .env.example file found!" -ForegroundColor Red' >> /app/startup.ps1 && \
-    echo '    }' >> /app/startup.ps1 && \
-    echo '}' >> /app/startup.ps1 && \
-    echo '' >> /app/startup.ps1 && \
-    echo '# Check if WSUS tools are available' >> /app/startup.ps1 && \
-    echo 'try {' >> /app/startup.ps1 && \
-    echo '    $module = Get-Module -ListAvailable -Name UpdateServices' >> /app/startup.ps1 && \
-    echo '    if ($null -eq $module) {' >> /app/startup.ps1 && \
-    echo '        Write-Host "WARNING: UpdateServices module not found. Some WSUS functionality may not work." -ForegroundColor Yellow' >> /app/startup.ps1 && \
-    echo '    } else {' >> /app/startup.ps1 && \
-    echo '        Write-Host "WSUS tools are available." -ForegroundColor Green' >> /app/startup.ps1 && \
-    echo '    }' >> /app/startup.ps1 && \
-    echo '} catch {' >> /app/startup.ps1 && \
-    echo '    Write-Host "WARNING: Error checking WSUS tools: $_" -ForegroundColor Yellow' >> /app/startup.ps1 && \
-    echo '}' >> /app/startup.ps1 && \
-    echo '' >> /app/startup.ps1 && \
-    echo '# Start the application' >> /app/startup.ps1 && \
-    echo 'npm start' >> /app/startup.ps1
+RUN echo "# Container startup script" > /app/startup.ps1
+RUN echo "Write-Host \"Starting WSUS Compliance Dashboard...\" -ForegroundColor Green" >> /app/startup.ps1
+RUN echo "" >> /app/startup.ps1
+RUN echo "# Check for .env file" >> /app/startup.ps1
+RUN echo "if (-not (Test-Path .env)) {" >> /app/startup.ps1
+RUN echo "    Write-Host \"No .env file found. Creating from template...\" -ForegroundColor Yellow" >> /app/startup.ps1
+RUN echo "    if (Test-Path .env.example) {" >> /app/startup.ps1
+RUN echo "        Copy-Item .env.example .env" >> /app/startup.ps1
+RUN echo "        Write-Host \"Created .env file from template. Please edit with your actual settings.\" -ForegroundColor Yellow" >> /app/startup.ps1
+RUN echo "    } else {" >> /app/startup.ps1
+RUN echo "        Write-Host \"WARNING: No .env.example file found!\" -ForegroundColor Red" >> /app/startup.ps1
+RUN echo "    }" >> /app/startup.ps1
+RUN echo "}" >> /app/startup.ps1
+RUN echo "" >> /app/startup.ps1
+RUN echo "# Check if WSUS tools are available" >> /app/startup.ps1
+RUN echo "try {" >> /app/startup.ps1
+RUN echo "    \$module = Get-Module -ListAvailable -Name UpdateServices" >> /app/startup.ps1
+RUN echo "    if (\$null -eq \$module) {" >> /app/startup.ps1
+RUN echo "        Write-Host \"WARNING: UpdateServices module not found. Some WSUS functionality may not work.\" -ForegroundColor Yellow" >> /app/startup.ps1
+RUN echo "    } else {" >> /app/startup.ps1
+RUN echo "        Write-Host \"WSUS tools are available.\" -ForegroundColor Green" >> /app/startup.ps1
+RUN echo "    }" >> /app/startup.ps1
+RUN echo "} catch {" >> /app/startup.ps1
+RUN echo "    Write-Host \"WARNING: Error checking WSUS tools: \$_\" -ForegroundColor Yellow" >> /app/startup.ps1
+RUN echo "}" >> /app/startup.ps1
+RUN echo "" >> /app/startup.ps1
+RUN echo "# Start the application" >> /app/startup.ps1
+RUN echo "npm start" >> /app/startup.ps1
 
 # Set the entry point
-ENTRYPOINT ["powershell", "-File", "startup.ps1"]
+ENTRYPOINT ["powershell", "-File", "/app/startup.ps1"]
