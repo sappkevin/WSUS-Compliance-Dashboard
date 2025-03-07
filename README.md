@@ -29,6 +29,10 @@ A web-based dashboard for monitoring and managing Windows Server Update Services
    ```bash
    cp .env.example .env
    ```
+4. Generate Session Secret
+   ```bash
+   python .\generate_session_secret.py
+   ```
 
 ## Configuration
 
@@ -63,17 +67,6 @@ The WSUS service account needs:
 3. Read access to Active Directory for LDAP authentication
 
 ## Running the Application
-
-### Generate Session Secret
-```bash
-python .\generate_session_secret.py
-```
-
-
-### Install dependencies
-```bash
-npm install
-```
 
 ### Development Mode
 ```bash
