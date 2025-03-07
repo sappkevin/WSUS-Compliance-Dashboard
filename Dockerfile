@@ -15,7 +15,16 @@ RUN choco install nodejs-lts -y
 RUN choco install nano -y
 
 # Refresh environment variables
-RUN try { refreshenv } catch { Write-Host "Refreshing environment variables failed, continuing anyway" } 
+RUN try { \
+      if (Test-Path $env:ChocolateyInstall\helpers\chocolateyProfile.psm1) { \
+        Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1; \
+        Update-SessionEnvironment; \
+      } else { \
+        Write-Host "Chocolatey profile module not found, skipping environment refresh"; \
+      } \
+    } catch { \
+      Write-Host "Error refreshing environment: $_"; \
+    } 
 
 # Try to enable the RSAT feature for WSUS tools (may require Windows Server edition)
 RUN try { \
