@@ -72,9 +72,32 @@ RUN Write-Host "Installing Node.js dependencies..."; \
       Write-Host "Dependencies installed successfully."; \
     }
 
-# Copy .env.example to .env.example if it doesn't exist
+# Create a default .env.example file if it doesn't exist
 RUN if (-not (Test-Path .env.example)) { \
-      Write-Output "# WSUS Server Configuration`nWSUS_SERVER=your-wsus-server`nWSUS_PORT=8530`nWSUS_USE_SSL=false`n`n# WSUS Service Account`nWSUS_SERVICE_ACCOUNT=domain\\service-account`nWSUS_SERVICE_PASSWORD=your-service-password`n`n# LDAP Configuration`nLDAP_URL=ldap://your-domain-controller`nLDAP_BASE_DN=DC=your,DC=domain,DC=com`nLDAP_USERNAME_ATTRIBUTE=sAMAccountName`nLDAP_GROUP_BASE_DN=OU=Groups,DC=your,DC=domain,DC=com`nLDAP_REQUIRED_GROUP=CN=WSUS_Admins,OU=Groups,DC=your,DC=domain,DC=com`n`n# Session Configuration`nSESSION_SECRET=your-random-secret-key`n`n# PowerShell Execution Configuration`nPOWERSHELL_EXECUTION_POLICY=Bypass" | Out-File -FilePath .env.example -Encoding utf8; \
+      $envContent = @"
+# WSUS Server Configuration
+WSUS_SERVER=your-wsus-server
+WSUS_PORT=8530
+WSUS_USE_SSL=false
+
+# WSUS Service Account
+WSUS_SERVICE_ACCOUNT=domain\\service-account
+WSUS_SERVICE_PASSWORD=your-service-password
+
+# LDAP Configuration
+LDAP_URL=ldap://your-domain-controller
+LDAP_BASE_DN=DC=your,DC=domain,DC=com
+LDAP_USERNAME_ATTRIBUTE=sAMAccountName
+LDAP_GROUP_BASE_DN=OU=Groups,DC=your,DC=domain,DC=com
+LDAP_REQUIRED_GROUP=CN=WSUS_Admins,OU=Groups,DC=your,DC=domain,DC=com
+
+# Session Configuration
+SESSION_SECRET=your-random-secret-key
+
+# PowerShell Execution Configuration
+POWERSHELL_EXECUTION_POLICY=Bypass
+"@; \
+      Set-Content -Path .env.example -Value $envContent -Encoding UTF8; \
     }
 
 # Build the application if a build script exists
