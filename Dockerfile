@@ -15,7 +15,7 @@ RUN choco install nodejs-lts -y
 RUN choco install nano -y
 
 # Refresh environment variables
-RUN $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User") 
+RUN refreshenv || $true 
 
 # Try to enable the RSAT feature for WSUS tools (may require Windows Server edition)
 RUN try { \
