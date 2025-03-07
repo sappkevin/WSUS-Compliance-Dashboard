@@ -15,7 +15,7 @@ RUN choco install nodejs-lts -y
 RUN choco install nano -y
 
 # Refresh environment variables
-RUN refreshenv || $true 
+RUN try { refreshenv } catch { Write-Host "Refreshing environment variables failed, continuing anyway" } 
 
 # Try to enable the RSAT feature for WSUS tools (may require Windows Server edition)
 RUN try { \
