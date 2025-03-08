@@ -1,5 +1,5 @@
 # Start with a Windows Server Core image that has PowerShell
-FROM mcr.microsoft.com/windows/server:ltsc2022
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
 # Set shell to PowerShell for Windows commands
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
@@ -13,29 +13,12 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
 RUN choco install git -y
 RUN choco install nodejs-lts -y
 RUN choco install nano -y
+RUN choco install powershell-core -y
 
-# Enable the RSAT feature for WSUS tools - this requires Windows Server
-RUN try { \
-      Install-WindowsFeature -Name RSAT-WSUS -IncludeManagementTools -IncludeAllSubFeature; \
-      Write-Host "WSUS Tools installed successfully."; \
-    } catch { \
-      Write-Host "WARNING: Failed to install WSUS Tools. Error: $_"; \
-    }
-
-# Install required PowerShell modules
-RUN try { \
-      Install-Module -Name PSWindowsUpdate -Force -AllowClobber -SkipPublisherCheck; \
-      Write-Host "PSWindowsUpdate module installed successfully."; \
-    } catch { \
-      Write-Host "WARNING: Failed to install PSWindowsUpdate module. Error: $_"; \
-    }
-
-RUN try { \
-      Install-Module -Name UpdateServices -Force -AllowClobber -SkipPublisherCheck; \
-      Write-Host "UpdateServices module installed successfully."; \
-    } catch { \
-      Write-Host "WARNING: Failed to install UpdateServices module. Error: $_"; \
-    }
+# WSUS Tools Installation Note
+RUN Write-Host "NOTE: WSUS Tools (RSAT-WSUS) cannot be installed directly in a container" -ForegroundColor Yellow
+RUN Write-Host "This container should be run on a Windows Server host with WSUS tools installed" -ForegroundColor Yellow
+RUN Write-Host "Or use the container for UI purposes only and connect to a remote WSUS server" -ForegroundColor Yellow
 
 # Create app directory
 WORKDIR /app
@@ -79,31 +62,34 @@ RUN if (Test-Path package.json) { \
 # Expose the port the app runs on
 EXPOSE 5000
 
-# Create a startup script
-RUN Set-Content -Path /app/startup.ps1 -Value "# Container startup script for WSUS Dashboard"
-RUN Add-Content -Path /app/startup.ps1 -Value "Write-Host `"Starting WSUS Dashboard Container...`" -ForegroundColor Green"
-RUN Add-Content -Path /app/startup.ps1 -Value ""
-RUN Add-Content -Path /app/startup.ps1 -Value "# Check if .env file exists"
-RUN Add-Content -Path /app/startup.ps1 -Value "if (-not (Test-Path .env)) {"
-RUN Add-Content -Path /app/startup.ps1 -Value "    Write-Host `"No .env file found. Creating from template...`" -ForegroundColor Yellow"
-RUN Add-Content -Path /app/startup.ps1 -Value "    "
-RUN Add-Content -Path /app/startup.ps1 -Value "    if (Test-Path .env.example) {"
-RUN Add-Content -Path /app/startup.ps1 -Value "        Copy-Item .env.example .env"
-RUN Add-Content -Path /app/startup.ps1 -Value "        Write-Host `"IMPORTANT: Default .env file created from template.`" -ForegroundColor Yellow"
-RUN Add-Content -Path /app/startup.ps1 -Value "        Write-Host `"You need to edit this file with your actual WSUS server settings.`" -ForegroundColor Yellow"
-RUN Add-Content -Path /app/startup.ps1 -Value "        Write-Host `"Use nano .env to edit the file.`" -ForegroundColor Yellow"
-RUN Add-Content -Path /app/startup.ps1 -Value "        Write-Host `"After editing, restart the container for changes to take effect.`" -ForegroundColor Yellow"
-RUN Add-Content -Path /app/startup.ps1 -Value "    } else {"
-RUN Add-Content -Path /app/startup.ps1 -Value "        Write-Host `"ERROR: .env.example file not found!`" -ForegroundColor Red"
-RUN Add-Content -Path /app/startup.ps1 -Value "        exit 1"
-RUN Add-Content -Path /app/startup.ps1 -Value "    }"
-RUN Add-Content -Path /app/startup.ps1 -Value "}"
+# Create the startup script
+RUN New-Item -Path /app/startup.ps1 -ItemType File -Force
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '# Container startup script for WSUS Dashboard'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value 'Write-Host \"Starting WSUS Dashboard Container...\" -ForegroundColor Green'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value ''"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '# Check if .env file exists'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value 'if (-not (Test-Path .env)) {'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '    Write-Host \"No .env file found. Creating from template...\" -ForegroundColor Yellow'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value ''"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '    if (Test-Path .env.example) {'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '        Copy-Item .env.example .env'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '        Write-Host \"IMPORTANT: Default .env file created from template.\" -ForegroundColor Yellow'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '        Write-Host \"You need to edit this file with your actual WSUS server settings.\" -ForegroundColor Yellow'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '        Write-Host \"Use nano .env to edit the file.\" -ForegroundColor Yellow'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '        Write-Host \"After editing, restart the container for changes to take effect.\" -ForegroundColor Yellow'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '    } else {'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '        Write-Host \"ERROR: .env.example file not found!\" -ForegroundColor Red'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '        exit 1'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '    }'"
+RUN powershell -Command "Add-Content -Path /app/startup.ps1 -Value '}'"
 RUN Add-Content -Path /app/startup.ps1 -Value ""
 RUN Add-Content -Path /app/startup.ps1 -Value "# Check if WSUS tools are available"
 RUN Add-Content -Path /app/startup.ps1 -Value "try {"
 RUN Add-Content -Path /app/startup.ps1 -Value "    `$module = Get-Module -ListAvailable -Name UpdateServices"
 RUN Add-Content -Path /app/startup.ps1 -Value "    if (`$null -eq `$module) {"
-RUN Add-Content -Path /app/startup.ps1 -Value "        Write-Host `"WARNING: UpdateServices module not found. Some WSUS functionality may not work.`" -ForegroundColor Yellow"
+RUN Add-Content -Path /app/startup.ps1 -Value "        Write-Host `"NOTICE: WSUS tools are not available in this container.`" -ForegroundColor Yellow"
+RUN Add-Content -Path /app/startup.ps1 -Value "        Write-Host `"This is normal when running in a containerized environment.`" -ForegroundColor Yellow"
+RUN Add-Content -Path /app/startup.ps1 -Value "        Write-Host `"The dashboard will run in UI-only mode and connect to a remote WSUS server.`" -ForegroundColor Yellow"
 RUN Add-Content -Path /app/startup.ps1 -Value "    } else {"
 RUN Add-Content -Path /app/startup.ps1 -Value "        Write-Host `"WSUS tools are available.`" -ForegroundColor Green"
 RUN Add-Content -Path /app/startup.ps1 -Value "    }"
