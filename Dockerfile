@@ -1,5 +1,5 @@
 # Start with a Windows Server Core image that has PowerShell
-FROM mcr.microsoft.com/windows/servercore:ltsc2022
+FROM mcr.microsoft.com/windows/server:ltsc2022
 
 # Set shell to PowerShell for Windows commands
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
