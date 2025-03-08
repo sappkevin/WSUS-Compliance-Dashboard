@@ -57,9 +57,5 @@ jobs:
       - name: Push Docker image
         if: github.event_name != 'pull_request'
         run: |
-          $TAGS = "${{ steps.prep.outputs.tags }}".Split(",")
-          foreach ($TAG in $TAGS) {
-            echo "Pushing $TAG"
-            docker tag sappkevin:${{ steps.prep.outputs.version }} $TAG
-            docker push $TAG
-          }
+            docker push sappkevin/wsus-dashboard:${{ steps.prep.outputs.version }}
+          
