@@ -1,4 +1,6 @@
 # WSUS Patch Compliance Dashboard
+[![WSUS Compliance Dashboard Build and Release](https://github.com/sappkevin/WSUS-Compliance-Dashboard/actions/workflows/docker-build.yml/badge.svg)](https://github.com/sappkevin/WSUS-Compliance-Dashboard/actions/workflows/docker-build.yml)
+[![Docker Hub](https://img.shields.io/docker/pulls/sappkevin/wsus-dashboard.svg)](https://hub.docker.com/r/sappkevin/wsus-dashboard)****
 
 A web-based dashboard for monitoring and managing Windows Server Update Services (WSUS) patch compliance across your organization. Built with React, Express, and MCP integration.
 
