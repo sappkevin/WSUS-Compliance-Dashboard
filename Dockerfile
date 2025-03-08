@@ -18,7 +18,7 @@ RUN choco install nano -y --no-progress
 RUN Add-WindowsCapability -Online -Name 'Rsat.WSUS.Tools~~~~0.0.1.0'
 
 RUN try { \
-      Import-Module -Name UpdateServices \
+      Get-Module -ListAvailable -Name UpdateServices; \
       Write-Output "UpdateServices module import test was successfully."; \
     } catch { \
       Write-Output "WARNING: Failed to import UpdateServices module. Error: $_"; \
