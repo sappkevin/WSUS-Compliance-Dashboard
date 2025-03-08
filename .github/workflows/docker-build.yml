@@ -30,6 +30,7 @@ jobs:
         id: prep
         run: |
           $VERSION = ""
+          $REPONAME= "sappkevin"
           if ("${{ github.ref }}" -like "refs/tags/v*") {
             $VERSION = "${{ github.ref }}".Replace('refs/tags/v', '')
           } elseif ("${{ github.ref }}" -eq "refs/heads/main" -or "${{ github.ref }}" -eq "refs/heads/master") {
@@ -38,9 +39,9 @@ jobs:
             $VERSION = "${{ github.sha }}".Substring(0, 7)
           }
           
-          $TAGS = "${{ env.IMAGE_NAME }}:$VERSION"
+          $TAGS = "$REPONAME:$VERSION"
           if ($VERSION -eq "latest") {
-            $TAGS = "$TAGS,${{ env.IMAGE_NAME }}:${{ github.sha }}".Substring(0, 7)
+            $TAGS = "$TAGS,$REPONAME:${{ github.sha }}".Substring(0, 7)
           }
           
           echo "version=$VERSION" >> $env:GITHUB_OUTPUT
@@ -58,8 +59,9 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           $TAGS = "${{ steps.prep.outputs.tags }}".Split(",")
+          $REPONAME= "sappkevin"
           foreach ($TAG in $TAGS) {
             echo "Pushing $TAG"
-            docker tag ${{ env.IMAGE_NAME }}:${{ steps.prep.outputs.version }} $TAG
+            docker tag $REPONAME:${{ steps.prep.outputs.version }} $TAG
             docker push $TAG
           }
