@@ -10,15 +10,18 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; \
     Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
 
 # Install Git, Node.js, and Nano
-RUN choco install git -y
-RUN choco install nodejs-lts -y
-RUN choco install nano -y
-RUN choco install powershell-core -y
+RUN choco install git -y --no-progress
+RUN choco install nodejs-lts -y --no-progress
+RUN choco install nano -y --no-progress
 
 # WSUS Tools Installation Note
-RUN Write-Host "NOTE: WSUS Tools (RSAT-WSUS) cannot be installed directly in a container" -ForegroundColor Yellow
+RUN Write-Host "NOTE: WSUS Tools RSAT WSUS cannot be installed directly in a container" -ForegroundColor Yellow
 RUN Write-Host "This container should be run on a Windows Server host with WSUS tools installed" -ForegroundColor Yellow
 RUN Write-Host "Or use the container for UI purposes only and connect to a remote WSUS server" -ForegroundColor Yellow
+RUN Add-WindowsCapability -Online -Name "Rsat.WSUS.Tools~~~~0.0.1.0"
+
+# PWSH Core install
+RUN choco install powershell-core -y --no-progress
 
 # Create app directory
 WORKDIR /app
