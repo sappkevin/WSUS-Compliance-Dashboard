@@ -18,7 +18,7 @@ RUN choco install nano -y --no-progress
 RUN Write-Host "NOTE: WSUS Tools RSAT WSUS cannot be installed directly in a container" -ForegroundColor Yellow
 RUN Write-Host "This container should be run on a Windows Server host with WSUS tools installed" -ForegroundColor Yellow
 RUN Write-Host "Or use the container for UI purposes only and connect to a remote WSUS server" -ForegroundColor Yellow
-RUN Add-WindowsCapability -Online -Name "Rsat.WSUS.Tools~~~~0.0.1.0"
+RUN Add-WindowsCapability -Online -Name 'Rsat.WSUS.Tools~~~~0.0.1.0'
 
 # PWSH Core install
 RUN choco install powershell-core -y --no-progress
